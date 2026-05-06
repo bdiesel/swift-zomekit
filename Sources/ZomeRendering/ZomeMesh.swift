@@ -3,10 +3,10 @@ import RealityKit
 import ZomeKit
 
 /// Indices into a `ZomeTimber`'s 8 corners for its 6 faces, matching
-/// builder.rb's PRISM_FACES. Winding is normalized at mesh-build time
-/// (each face is flipped if its raw normal points toward the prism
-/// centroid), so callers can rely on outward-facing normals regardless
-/// of how SketchUp ordered the corners.
+/// builder.rb's PRISM_FACES. Winding is normalized at build time (each
+/// face is flipped if its raw normal points toward the prism centroid),
+/// so callers can rely on outward-facing normals regardless of how
+/// SketchUp ordered the corners.
 private let prismFaces: [(Int, Int, Int, Int)] = [
     (1, 0, 2, 3),   // top      (sits on the outer dome surface)
     (5, 4, 6, 7),   // bottom   (inner)
@@ -17,11 +17,15 @@ private let prismFaces: [(Int, Int, Int, Int)] = [
 ]
 
 extension ZomeTimber {
-    /// Flat-shaded `MeshResource` for this 8-vertex prism. Vertices are
-    /// duplicated per face so each face gets its own normal — clean
-    /// readable timber edges instead of smooth-blended ones.
-    @MainActor
-    public func meshResource(scale: Float = 1.0) throws -> MeshResource {
+    /// Build a flat-shaded `MeshDescriptor` for this 8-vertex prism.
+    ///
+    /// **Pure data — safe to call from any actor.** Use this when you want
+    /// to compute mesh geometry on a background task and only hop to the
+    /// main actor for the RealityKit upload step.
+    ///
+    /// Vertices are duplicated per face so each face gets its own normal,
+    /// giving clean readable timber edges instead of smooth-blended ones.
+    public func meshDescriptor(scale: Float = 1.0) -> MeshDescriptor {
         var positions: [SIMD3<Float>] = []
         var normals: [SIMD3<Float>] = []
         var indices: [UInt32] = []
@@ -61,6 +65,15 @@ extension ZomeTimber {
         descriptor.positions = MeshBuffer(positions)
         descriptor.normals = MeshBuffer(normals)
         descriptor.primitives = .triangles(indices)
-        return try MeshResource.generate(from: [descriptor])
+        return descriptor
+    }
+
+    /// Convenience: build the descriptor and upload it to RealityKit in
+    /// one call. Lives on `MainActor` because that's where
+    /// `MeshResource.generate(from:)` is required to run — not because
+    /// the descriptor work needs the main thread.
+    @MainActor
+    public func meshResource(scale: Float = 1.0) throws -> MeshResource {
+        try MeshResource.generate(from: [meshDescriptor(scale: scale)])
     }
 }
