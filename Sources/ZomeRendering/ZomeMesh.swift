@@ -28,9 +28,11 @@ extension ZomeTimber {
     public func meshDescriptor(scale: Float = 1.0) -> MeshDescriptor {
         var positions: [SIMD3<Float>] = []
         var normals: [SIMD3<Float>] = []
+        var uvs: [SIMD2<Float>] = []
         var indices: [UInt32] = []
         positions.reserveCapacity(prismFaces.count * 4)
         normals.reserveCapacity(prismFaces.count * 4)
+        uvs.reserveCapacity(prismFaces.count * 4)
         indices.reserveCapacity(prismFaces.count * 6)
 
         // Pre-scale & convert to Float once.
@@ -49,21 +51,42 @@ extension ZomeTimber {
             let faceCenter = (p0 + p1 + p2 + p3) * 0.25
             let outward = faceCenter - centroid
             var n = simd_cross(p1 - p0, p2 - p0)
+            var flipped = false
             if simd_dot(n, outward) < 0 {
                 swap(&p1, &p3)              // [p0,p3,p2,p1] = reverse winding
                 n = simd_cross(p1 - p0, p2 - p0)
+                flipped = true
             }
             n = simd_normalize(n)
+
+            // Per-face UVs spanning the quad — the longest face edge gets
+            // mapped to the U axis so a horizontally-striped wood texture's
+            // grain runs along the timber's long axis.
+            let edge0 = simd_length(p1 - p0)
+            let edge1 = simd_length(p2 - p1)
+            let longerIsP0P1 = edge0 >= edge1
+            // Two layouts: long edge along U or along V. Either way each
+            // quad is mapped to (0,0)-(1,1), so the texture wraps once.
+            let quadUVs: [SIMD2<Float>] = longerIsP0P1
+                ? [.init(0, 0), .init(1, 0), .init(1, 1), .init(0, 1)]
+                : [.init(0, 0), .init(0, 1), .init(1, 1), .init(1, 0)]
+            // If we flipped the winding above, mirror UVs so the texture
+            // doesn't appear mirrored on those faces.
+            let finalUVs = flipped
+                ? [quadUVs[0], quadUVs[3], quadUVs[2], quadUVs[1]]
+                : quadUVs
 
             let base = UInt32(positions.count)
             positions.append(contentsOf: [p0, p1, p2, p3])
             normals.append(contentsOf: Array(repeating: n, count: 4))
+            uvs.append(contentsOf: finalUVs)
             indices.append(contentsOf: [base, base + 1, base + 2, base, base + 2, base + 3])
         }
 
         var descriptor = MeshDescriptor(name: "timber")
         descriptor.positions = MeshBuffer(positions)
         descriptor.normals = MeshBuffer(normals)
+        descriptor.textureCoordinates = MeshBuffer(uvs)
         descriptor.primitives = .triangles(indices)
         return descriptor
     }
