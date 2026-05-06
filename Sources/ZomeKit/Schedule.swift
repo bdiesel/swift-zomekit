@@ -1,7 +1,8 @@
 import Foundation
 
 /// A grouped row in the cut list — one row per unique (length, cutAngleA, cutAngleB) bucket.
-public struct CutListEntry: Equatable, Sendable {
+public struct CutListEntry: Equatable, Sendable, Identifiable {
+    public var id: String { label }
     public let label: String          // "T1" (longest) … "TN"
     public let quantity: Int
     public let length: Double
