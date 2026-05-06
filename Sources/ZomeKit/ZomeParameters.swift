@@ -2,7 +2,7 @@ import Foundation
 
 /// Parametric inputs to a zome. Unit-agnostic — the caller decides whether
 /// these are inches, millimetres, or anything else; ZomeKit just does math.
-public struct ZomeParameters: Equatable, Sendable {
+public struct ZomeParameters: Equatable, Sendable, Codable {
     /// Number of spirals / rotational symmetry order. Each spiral covers `360°/N` around the Y axis.
     public var numSpirals: Int
     /// Tilt of the first crown edge from the apex axis, in degrees. Drives the dome's steepness.
