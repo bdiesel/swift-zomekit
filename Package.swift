@@ -20,6 +20,13 @@ let package = Package(
     targets: [
         .target(name: "ZomeKit"),
         .target(name: "ZomeRendering", dependencies: ["ZomeKit"]),
+        // Internal tool — `swift run IconExporter <out-dir>` writes the
+        // app-icon PNGs (composite + each layer) for asset-catalog use.
+        // Not exposed as a public product; macOS-only inside.
+        .executableTarget(
+            name: "IconExporter",
+            dependencies: ["ZomeRendering"]
+        ),
         .testTarget(name: "ZomeKitTests", dependencies: ["ZomeKit"]),
     ]
 )
