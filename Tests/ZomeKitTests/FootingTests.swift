@@ -1,8 +1,44 @@
 import Testing
+import Foundation
 @testable import ZomeKit
 
-@Suite("Footing prisms")
+@Suite("Footing prisms + floor slab")
 struct FootingTests {
+    // MARK: Floor polygon
+
+    @Test func defaultFloorHasMatchingPolygonCount() {
+        let params = ZomeParameters.goodKarmaDefault
+        let geom = Zome.build(params)
+        let polygon = Zome.floorPolygon(for: geom, params: params)
+        // 10-spiral default — at least 10 distinct outer corners on the floor.
+        #expect(polygon.count >= params.numSpirals)
+    }
+
+    @Test("All floor polygon vertices share Y")
+    func floorPolygonIsHorizontal() {
+        let params = ZomeParameters.goodKarmaDefault
+        let geom = Zome.build(params)
+        let polygon = Zome.floorPolygon(for: geom, params: params)
+        guard let firstY = polygon.first?.y else { return }
+        for p in polygon {
+            #expect(approx(p.y, firstY, tolerance: 1e-9))
+        }
+    }
+
+    @Test("Floor polygon is sorted CCW around the Y axis")
+    func floorPolygonIsSortedByAngle() {
+        let params = ZomeParameters.goodKarmaDefault
+        let geom = Zome.build(params)
+        let polygon = Zome.floorPolygon(for: geom, params: params)
+        guard polygon.count > 2 else { return }
+        let angles = polygon.map { atan2($0.z, $0.x) }
+        for i in 1..<angles.count {
+            #expect(angles[i] >= angles[i - 1])
+        }
+    }
+
+    // MARK: Footing prisms
+
     @Test func defaultsHaveAtLeastOneFooting() {
         let params = ZomeParameters.goodKarmaDefault
         let geom = Zome.build(params)

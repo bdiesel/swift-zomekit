@@ -57,6 +57,51 @@ extension Zome {
         }
     }
 
+    /// Outline of the dome's floor slab — the polygon connecting all outer
+    /// floor corners across every spiral. Sorted by angle around Y so the
+    /// returned array winds the polygon in CCW order (viewed from above);
+    /// suitable for triangulating into a single flat mesh below the dome.
+    /// Returns an empty array if there are no footings to anchor a floor.
+    public static func floorPolygon(
+        for geometry: ZomeGeometry,
+        params: ZomeParameters
+    ) -> [Vec3] {
+        let footingPrisms = footings(for: geometry, params: params)
+        guard !footingPrisms.isEmpty else { return [] }
+
+        // Outer floor corners are positions 0 and 2 (A and C) of each prism.
+        let outerCorners: [Vec3] = footingPrisms.flatMap { [$0.points[0], $0.points[2]] }
+
+        // Replicate around Y for every spiral.
+        var rotated: [Vec3] = []
+        rotated.reserveCapacity(outerCorners.count * geometry.rotationAngles.count)
+        for angle in geometry.rotationAngles {
+            let cosA = cos(angle)
+            let sinA = sin(angle)
+            for p in outerCorners {
+                rotated.append(Vec3(
+                    p.x * cosA + p.z * sinA,
+                    p.y,
+                    -p.x * sinA + p.z * cosA
+                ))
+            }
+        }
+
+        // Dedupe close-together points. Tolerance: 0.05 in whatever unit
+        // ZomeKit was given (0.05" or 0.05mm — fine either way given the
+        // scale of these models).
+        var unique: [Vec3] = []
+        for p in rotated {
+            if !unique.contains(where: { ($0 - p).length < 0.05 }) {
+                unique.append(p)
+            }
+        }
+
+        // Sort by angle around Y so the polygon winds consistently.
+        unique.sort { atan2($0.z, $0.x) < atan2($1.z, $1.x) }
+        return unique
+    }
+
     /// Edge-index within the per-face timbers array that corresponds to the
     /// face's ground-touching edge. Matches the Ruby reference.
     private static func bottomTimberIndex(for face: ZomeFace) -> Int {
