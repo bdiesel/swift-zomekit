@@ -66,21 +66,26 @@ public enum WorldAxes {
         // Each axis bar is rendered slightly above Y=0 so it doesn't z-fight the grid.
         let lift: Float = 0.0008
 
+        // SketchUp-style colour convention: red = horizontal (X), blue =
+        // vertical (Y, up), green = forward (Z). The math underneath is
+        // still RealityKit's native Y-up — only the visible bar colours
+        // are remapped so a SketchUp user sees blue pointing up.
+
         // X — red, +X
         let xMesh = MeshResource.generateBox(size: SIMD3<Float>(length, lineWidth, lineWidth))
         let xAxis = ModelEntity(mesh: xMesh, materials: [unlitMaterial(red: 0.85, green: 0.20, blue: 0.20)])
         xAxis.position = SIMD3<Float>(length / 2, lift, 0)
         axes.addChild(xAxis)
 
-        // Y — green, +Y (up)
+        // Y — blue, +Y (up)
         let yMesh = MeshResource.generateBox(size: SIMD3<Float>(lineWidth, length, lineWidth))
-        let yAxis = ModelEntity(mesh: yMesh, materials: [unlitMaterial(red: 0.20, green: 0.70, blue: 0.25)])
+        let yAxis = ModelEntity(mesh: yMesh, materials: [unlitMaterial(red: 0.20, green: 0.40, blue: 0.95)])
         yAxis.position = SIMD3<Float>(0, length / 2, 0)
         axes.addChild(yAxis)
 
-        // Z — blue, +Z
+        // Z — green, +Z (forward)
         let zMesh = MeshResource.generateBox(size: SIMD3<Float>(lineWidth, lineWidth, length))
-        let zAxis = ModelEntity(mesh: zMesh, materials: [unlitMaterial(red: 0.20, green: 0.40, blue: 0.95)])
+        let zAxis = ModelEntity(mesh: zMesh, materials: [unlitMaterial(red: 0.20, green: 0.70, blue: 0.25)])
         zAxis.position = SIMD3<Float>(0, lift, length / 2)
         axes.addChild(zAxis)
 
