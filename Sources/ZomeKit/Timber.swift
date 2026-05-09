@@ -21,15 +21,18 @@ public struct ZomeTimber: Equatable, Sendable {
     public var h: Vec3 { points[7] }
 }
 
-/// Port of `Polygon3D.compute_framework` for assembly_method=0 (GoodKarma),
-/// assembly_direction=0 (Clockwise Rotation), xpansion_direction=+1 (inward).
-/// Other modes are intentionally unimplemented in v1.
+/// Port of `Polygon3D.compute_framework` for `assembly_direction=0`
+/// (Clockwise Rotation) and `xpansion_direction=+1` (inward). All three
+/// `AssemblyMethod` cases are supported; per-method differences are isolated
+/// in the per-vertex `offsets(for:...)` block, so the prism-construction
+/// loop downstream stays the same.
 enum TimberBuilder {
     static func build(
         face facePoints: [Vec3],
         vanishingPoint vanishingPt: Vec3,
         timberThickness: Double,
-        timberWidth: Double
+        timberWidth: Double,
+        assemblyMethod: AssemblyMethod = .goodKarma
     ) -> [ZomeTimber] {
         let n = facePoints.count
         let nextIdx = (0..<n).map { ($0 + 1) % n }
@@ -54,11 +57,62 @@ enum TimberBuilder {
             let cur2prev = prv - cur
             let mid2van = vanishingPt - mid
 
-            // GoodKarma: thickness offset is perpendicular to the face plane;
-            // vertical projection is in the face plane perpendicular to the edge.
-            let hProj = Vec3.cross(cur2sec, mid2van)
-            let thickPt = Vec3.point(from: mid, towards: hProj, distance: timberThickness)
-            let vProj = Vec3.cross(hProj, cur2sec)              // xpansion = +1 (inward) -> no flip
+            var hProj: Vec3
+            var thickPt: Vec3
+            var vProj: Vec3
+
+            switch assemblyMethod {
+            case .goodKarma:
+                // Thickness perpendicular to the face plane via cross-product
+                // with the midpoint→vanishing direction; width drops in the
+                // face plane perpendicular to the edge. xpansion=+1 (inward),
+                // so vProj is left as-is.
+                hProj   = Vec3.cross(cur2sec, mid2van)
+                thickPt = Vec3.point(from: mid, towards: hProj, distance: timberThickness)
+                vProj   = Vec3.cross(hProj, cur2sec)
+
+            case .beveled, .xpansion:
+                // θ-pivoted offset. Build a right triangle at the vertex with
+                // hypotenuse `t/sin θ` along the prev edge; thickness offset
+                // lands `t/tan θ` back along cur→next from the midpoint.
+                let theta = Self.vertexAngle(prev: cur2prev, next: cur2sec)
+                let hypotenuse = timberThickness / sin(theta)
+                let adjacent   = timberThickness / tan(theta)
+                let pivot = Vec3.point(from: mid, towards: cur2sec, distance: -adjacent)
+                thickPt = Vec3.point(from: pivot, towards: cur2prev, distance: hypotenuse)
+                hProj = thickPt - mid
+
+                let halfPi = Double.pi / 2
+                if abs(theta - halfPi) < 1e-6 {
+                    // Cross-product hack for exact 90° vertices.
+                    vProj = Vec3.cross(cur2sec, cur2prev)
+                } else if theta > halfPi {
+                    vProj = Vec3.cross(hProj, cur2prev)
+                } else {
+                    vProj = Vec3.cross(hProj, -cur2prev)
+                }
+
+                if assemblyMethod == .beveled {
+                    // xpansion=+1 → multiply by -1 for beveled-inward.
+                    vProj = -vProj
+
+                    let wp = Plane(through: cur, mid, vanishingPt)
+                    let candidateWidthPt = Vec3.point(from: thickPt, towards: vProj, distance: timberWidth)
+                    let oppositeMid = intersection(point: candidateWidthPt, direction: hProj, plane: wp)
+                    let oppositeThickness = (oppositeMid - candidateWidthPt).length
+
+                    if oppositeThickness > timberThickness {
+                        // Clamp so the inner face's effective thickness ≤ the
+                        // requested thickness — otherwise the inset face would
+                        // read as a wider beam than the outer.
+                        let delta = oppositeThickness - timberThickness
+                        thickPt = Vec3.point(from: mid, towards: hProj, distance: timberThickness - delta)
+                    }
+                }
+            }
+
+            // Compute width offset once, after any thickness-clamp, using
+            // the current vProj (signs already applied in the switch).
             let widthPt = Vec3.point(from: thickPt, towards: vProj, distance: timberWidth)
 
             ccwVecs[i] = cur2sec
@@ -67,7 +121,16 @@ enum TimberBuilder {
             thicknessPts[i] = thickPt
             widthPts[i] = widthPt
 
-            wallPlanes[i] = Plane(through: cur, mid, vanishingPt)
+            // Wall plane: GoodKarma + Beveled use the vanishing-point line;
+            // Xpansion uses the vertical projection instead.
+            switch assemblyMethod {
+            case .goodKarma, .beveled:
+                wallPlanes[i] = Plane(through: cur, mid, vanishingPt)
+            case .xpansion:
+                let projAnchor = Vec3.point(from: mid, towards: vProj, distance: 100.0)
+                wallPlanes[i] = Plane(through: cur, mid, projAnchor)
+            }
+
             // Shifted wall plane is offset by the thickness/width pair, matching
             // z5omes' `point_to(thickness_offset_pt, cur_2_sec_vec, 100)` triangle.
             shiftedWallPlanes[i] = Plane(
@@ -101,19 +164,35 @@ enum TimberBuilder {
             let alongPlane = wallPlanes[i]
             let midWithV = intersection(point: widthPt, direction: hProj, plane: alongPlane)
 
-            let A = intersection(point: mid,      direction: sec2cur, plane: plane0)
-            let B = intersection(point: thickPt,  direction: sec2cur, plane: plane1)
-            let C = intersection(point: mid,      direction: cur2sec, plane: plane2)
-            let D = intersection(point: thickPt,  direction: cur2sec, plane: plane3)
+            var pA = intersection(point: mid,      direction: sec2cur, plane: plane0)
+            var pB = intersection(point: thickPt,  direction: sec2cur, plane: plane1)
+            var pC = intersection(point: mid,      direction: cur2sec, plane: plane2)
+            var pD = intersection(point: thickPt,  direction: cur2sec, plane: plane3)
 
-            let E = intersection(point: midWithV, direction: sec2cur, plane: plane0)
-            let F = intersection(point: widthPt,  direction: sec2cur, plane: plane1)
-            let G = intersection(point: midWithV, direction: cur2sec, plane: plane2)
-            let H = intersection(point: widthPt,  direction: cur2sec, plane: plane3)
+            var pE = intersection(point: midWithV, direction: sec2cur, plane: plane0)
+            var pF = intersection(point: widthPt,  direction: sec2cur, plane: plane1)
+            var pG = intersection(point: midWithV, direction: cur2sec, plane: plane2)
+            var pH = intersection(point: widthPt,  direction: cur2sec, plane: plane3)
 
-            timbers.append(ZomeTimber(points: [A, B, C, D, E, F, G, H]))
+            // Xpansion mode is the "outward expansion" case: top and bottom
+            // of the prism flip — A..D becomes the inner trapezoid, E..H the
+            // outer one (the dome's outside surface).
+            if assemblyMethod == .xpansion {
+                swap(&pA, &pE); swap(&pB, &pF); swap(&pC, &pG); swap(&pD, &pH)
+            }
+
+            timbers.append(ZomeTimber(points: [pA, pB, pC, pD, pE, pF, pG, pH]))
         }
 
         return timbers
+    }
+
+    /// Interior angle at a polygon vertex, given the two edges leaving it
+    /// (cur→prev and cur→next). Result in radians, clamped to `[0, π]`.
+    private static func vertexAngle(prev: Vec3, next: Vec3) -> Double {
+        let pn = prev.normalized
+        let nn = next.normalized
+        let dot = (pn * nn).sum()
+        return acos(max(-1.0, min(1.0, dot)))
     }
 }

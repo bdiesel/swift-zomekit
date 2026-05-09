@@ -21,6 +21,8 @@ public struct ZomeParameters: Equatable, Sendable, Codable {
     public var binduRatios: [Double]
     /// Y coordinate of the GoodKarma vanishing point. `nil` = auto-compute as the centroid of the dome.
     public var vanishingY: Double?
+    /// How timber prisms are framed against the faces. Defaults to GoodKarma.
+    public var assemblyMethod: AssemblyMethod
 
     public init(
         numSpirals: Int,
@@ -31,7 +33,8 @@ public struct ZomeParameters: Equatable, Sendable, Codable {
         timberWidth: Double,
         timberThickness: Double,
         binduRatios: [Double] = [],
-        vanishingY: Double? = nil
+        vanishingY: Double? = nil,
+        assemblyMethod: AssemblyMethod = .goodKarma
     ) {
         self.numSpirals = numSpirals
         self.thetaDegrees = thetaDegrees
@@ -42,6 +45,7 @@ public struct ZomeParameters: Equatable, Sendable, Codable {
         self.timberThickness = timberThickness
         self.binduRatios = binduRatios
         self.vanishingY = vanishingY
+        self.assemblyMethod = assemblyMethod
     }
 
     /// Brian's reference screenshot: 122" × 151.0625" envelope, 270 timbers in 16 sizes.
@@ -54,6 +58,28 @@ public struct ZomeParameters: Equatable, Sendable, Codable {
         timberWidth: 3.5,
         timberThickness: 1.5
     )
+
+    // MARK: - Codable (custom decoder so 0.1.x .zome files without
+    // `assemblyMethod` load cleanly with the GoodKarma default)
+
+    private enum CodingKeys: String, CodingKey {
+        case numSpirals, thetaDegrees, kiteRatio, heightRatio, zomeHeight,
+             timberWidth, timberThickness, binduRatios, vanishingY, assemblyMethod
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.numSpirals      = try c.decode(Int.self,      forKey: .numSpirals)
+        self.thetaDegrees    = try c.decode(Double.self,   forKey: .thetaDegrees)
+        self.kiteRatio       = try c.decode(Double.self,   forKey: .kiteRatio)
+        self.heightRatio     = try c.decode(Double.self,   forKey: .heightRatio)
+        self.zomeHeight      = try c.decode(Double.self,   forKey: .zomeHeight)
+        self.timberWidth     = try c.decode(Double.self,   forKey: .timberWidth)
+        self.timberThickness = try c.decode(Double.self,   forKey: .timberThickness)
+        self.binduRatios     = try c.decodeIfPresent([Double].self, forKey: .binduRatios) ?? []
+        self.vanishingY      = try c.decodeIfPresent(Double.self,   forKey: .vanishingY)
+        self.assemblyMethod  = try c.decodeIfPresent(AssemblyMethod.self, forKey: .assemblyMethod) ?? .goodKarma
+    }
 }
 
 extension ZomeParameters {

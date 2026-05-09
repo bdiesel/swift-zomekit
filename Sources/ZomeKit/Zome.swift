@@ -40,7 +40,8 @@ public enum Zome {
                 face: face.points,
                 vanishingPoint: vanishingPt,
                 timberThickness: params.timberThickness,
-                timberWidth: params.timberWidth
+                timberWidth: params.timberWidth,
+                assemblyMethod: params.assemblyMethod
             )
         }
 
