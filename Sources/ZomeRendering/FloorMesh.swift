@@ -8,8 +8,9 @@ import ZomeKit
 @MainActor
 public enum FloorMesh {
     /// Build a triangle-fan mesh from a polygon's perimeter vertices,
-    /// fanning from the centroid. Returns `nil` if fewer than 3 points.
-    public static func generate(polygon: [Vec3], scale: Float = 1.0) throws -> MeshResource? {
+    /// fanning from the centroid. Returns `nil` for fewer than 3 points
+    /// or if RealityKit refuses the descriptor.
+    public static func generate(polygon: [Vec3], scale: Float = 1.0) -> MeshResource? {
         guard polygon.count >= 3 else { return nil }
 
         // Centroid (works as the fan apex because the polygon is convex
@@ -37,6 +38,6 @@ public enum FloorMesh {
         descriptor.positions = MeshBuffer(positions)
         descriptor.normals = MeshBuffer(normals)
         descriptor.primitives = .triangles(indices)
-        return try MeshResource.generate(from: [descriptor])
+        return try? MeshResource.generate(from: [descriptor])
     }
 }
