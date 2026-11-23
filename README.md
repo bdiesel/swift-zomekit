@@ -11,8 +11,8 @@ ZomeKit is **math only** — no UI, no rendering, no platform-specific framework
 ## Requirements
 
 - Swift 6.0 toolchain (Xcode 16+)
-- Apple platforms: macOS 13, iOS 16, visionOS 1, tvOS 16 (plus the RealityKit-based `ZomeRendering` helpers)
-- Also builds on Linux (no Apple-only frameworks)
+- Apple platforms: macOS 13, iOS 16, visionOS 1, tvOS 16
+- Linux: the `ZomeKit` library builds and its tests run in CI on every push
 
 ## Install
 
