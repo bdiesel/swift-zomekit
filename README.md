@@ -1,5 +1,7 @@
 # ZomeKit
 
+[![CI](https://github.com/bdiesel/swift-zomekit/actions/workflows/ci.yml/badge.svg)](https://github.com/bdiesel/swift-zomekit/actions/workflows/ci.yml) ![Swift 6](https://img.shields.io/badge/Swift-6.0-F05138?logo=swift&logoColor=white) ![Platforms](https://img.shields.io/badge/platforms-iOS%20%7C%20macOS%20%7C%20visionOS%20%7C%20Linux-informational) [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
+
 A pure-Swift library for generating parametric **zome** geometry — the polyhedral, Steve-Baer-style timber-framed domes built from rotational rings of kite-shaped faces.
 
 ZomeKit is **math only** — no UI, no rendering, no platform-specific frameworks. It produces the outer-shell vertices, per-edge timber prisms, and a grouped cut list. Render the result with RealityKit, SceneKit, Metal, three.js via WASM, or anything else that takes triangles.
